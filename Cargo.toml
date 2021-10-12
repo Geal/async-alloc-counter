@@ -2,6 +2,8 @@
 name = "async-alloc-counter"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "async-alloc-counter measures max allocations in a future invocation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
