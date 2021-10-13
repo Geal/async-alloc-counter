@@ -19,7 +19,7 @@ async fn main() {
                         println!("{}", s);
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
-                    .trace()
+                    .count_allocations()
                     .map(move |(max, ())| {
                         println!("inner task {} allocated {} max bytes", i * 1000 + j, max);
                     }),
@@ -28,7 +28,7 @@ async fn main() {
                 .unwrap();
             }
         }
-        .trace()
+        .count_allocations()
         .map(move |(max, ())| {
             println!("task {} allocated {} max bytes", i, max);
         });

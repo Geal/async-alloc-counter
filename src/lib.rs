@@ -1,6 +1,53 @@
 //! async-alloc-counter measures max allocations in a future invocation
 //!
 //! see `examples/` for usage
+//!
+//! This allocator can be used as follows:
+//!
+//! ```rust
+//! use async_alloc_counter::*;
+//! use futures::FutureExt;
+//! use std::{alloc::System, time::Duration};
+//!
+//! // set up the counting allocator
+//! #[global_allocator]
+//! static GLOBAL: AsyncAllocatorCounter<System> = AsyncAllocatorCounter { allocator: System };
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!   async move {
+//!     let mut v: Vec<u8> = Vec::with_capacity(1024);
+//!   }.count_allocations()
+//!    .map(move |(max, ())| {
+//!      println!("future allocated {} max bytes",  max);
+//!    })
+//!    .await
+//! }
+//! ```
+//!
+//! Allocation measurement can be stacked:
+//!
+//! ```rust,ignore
+//! async move {
+//!   println!("wrapping future");
+//!   tokio::time::sleep(std::timeDuration::from_secs(1)).await;
+//!   let mut v: Vec<u8> = Vec::with_capacity(256);
+//!
+//!   async move {
+//!       let mut v: Vec<u8> = Vec::with_capacity(1024);
+//!     }.count_allocations()
+//!      .map(move |(max, ())| {
+//!        println!("future allocated {} max bytes",  max);
+//!      })
+//!      .await
+//!   }.count_allocations()
+//!    .map(move |(max, ())| {
+//!      println!("warpping future allocated {} max bytes",  max);
+//!    })
+//!    .await
+//! ```
+//!
+//! Design inspired by the excellent [tracing](https://crates.io/crates/tracing) crate
 use pin_project_lite::pin_project;
 use std::{
     alloc::{GlobalAlloc, Layout},
@@ -11,6 +58,20 @@ use std::{
     thread_local,
 };
 
+/// Allocator wrapper
+///
+/// this allocator will measure how much data is allocated in the future
+/// that is currently executed
+///
+/// Set t up as follows:
+///
+/// ```rust
+/// use async_alloc_counter::AsyncAllocatorCounter;
+/// use std::{alloc::System, time::Duration};
+
+/// #[global_allocator]
+/// static GLOBAL: AsyncAllocatorCounter<System> = AsyncAllocatorCounter { allocator: System };
+/// ```
 pub struct AsyncAllocatorCounter<T> {
     pub allocator: T,
 }
@@ -40,9 +101,13 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for AsyncAllocatorCounter<T> {
     }
 }
 
-
+/// measure allocations for a future
 pub trait TraceAlloc: Sized {
-    fn trace(self) -> TraceAllocator<Self> {
+    /// Wraps the future and returns a new one that will resolve
+    /// to `(max allocations, future result)`
+    ///
+    /// You can measure multiple nested futures
+    fn count_allocations(self) -> TraceAllocator<Self> {
         TraceAllocator {
             inner: self,
             previous: None,
@@ -131,6 +196,7 @@ impl<T: Future> Future for TraceAllocator<T> {
     }
 }
 
+/// statistics for the current allocation frame
 struct AllocationFrame {
     max: usize,
     current: usize,
