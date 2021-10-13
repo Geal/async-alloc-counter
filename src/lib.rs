@@ -40,11 +40,11 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for AsyncAllocatorCounter<T> {
     }
 }
 
+
 pub trait TraceAlloc: Sized {
-    fn trace(self, id: u32) -> TraceAllocator<Self> {
+    fn trace(self) -> TraceAllocator<Self> {
         TraceAllocator {
             inner: self,
-            id,
             previous: None,
             max: 0,
             current: 0,
@@ -58,7 +58,6 @@ pin_project! {
     pub struct TraceAllocator<T> {
         #[pin]
         inner: T,
-        id: u32,
         max: usize,
         current: usize,
         previous: Option<AllocationFrame>,
