@@ -77,18 +77,45 @@ impl<T: Future> Future for TraceAllocator<T> {
 
         assert!(this.previous.is_none());
         let current = Some(AllocationFrame {
-            max: *this.max,
+            // we want to know the maximum allocation in this current call of the
+            // future, we start at the currently allocated value
+            max: *this.current,
             current: *this.current,
         });
+
+        // store the allocation frame from upper layers if there was one
         *this.previous = CurrentFrame.with(|frame| {
             let prev = (*frame.borrow_mut()).take();
             *frame.borrow_mut() = current;
             prev
         });
+
         let res = this.inner.poll(cx);
-        let previous = this.previous.take();
+
+        let mut previous = this.previous.take();
         if let Some(AllocationFrame { max, current }) = CurrentFrame.with(|frame| {
             let current = (*frame.borrow_mut()).take();
+
+            if let Some(prev) = previous.as_mut() {
+                if let Some(f) = current.as_ref() {
+                    // prev.current contains the total current allocation in the
+                    // previous frame, including allocations in the current frame
+                    // to chek if we can raise the max in the previous frame,
+                    // we need to substrat this.current, which was already
+                    // integrated in prev.current, and add the max allocations
+                    // seen in the current invocation
+                    if prev.current - *this.current + f.max > prev.max {
+                        prev.max = prev.current - *this.current + f.max;
+                    }
+
+                    if f.current > *this.current {
+                        prev.current += f.current - *this.current;
+                    } else {
+                        prev.current -= *this.current - f.current;
+                    }
+                }
+            }
+
             *frame.borrow_mut() = previous;
             current
         }) {
@@ -96,8 +123,6 @@ impl<T: Future> Future for TraceAllocator<T> {
                 *this.max = max;
             }
             *this.current = current;
-
-            //println!("after: max={}, current={}", *this.max, *this.current);
         }
 
         match res {
