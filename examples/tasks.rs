@@ -7,7 +7,7 @@ static GLOBAL: AsyncAllocatorCounter<System> = AsyncAllocatorCounter { allocator
 
 #[tokio::main]
 async fn main() {
-    for i in 1..1000 {
+    for i in 1..100 {
         let f = async move {
             let mut v = Vec::new();
 

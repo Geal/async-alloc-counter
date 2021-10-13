@@ -61,12 +61,12 @@ pin_project! {
         id: u32,
         max: usize,
         current: usize,
-        previous: Option<AllocFrame>,
+        previous: Option<AllocationFrame>,
     }
 }
 
 thread_local! {
-    static CurrentFrame: RefCell<Option<AllocFrame>> = RefCell::new(None);
+    static CurrentFrame: RefCell<Option<AllocationFrame>> = RefCell::new(None);
 }
 
 impl<T: Future> Future for TraceAllocator<T> {
@@ -76,7 +76,7 @@ impl<T: Future> Future for TraceAllocator<T> {
         let this = self.project();
 
         assert!(this.previous.is_none());
-        let current = Some(AllocFrame {
+        let current = Some(AllocationFrame {
             max: *this.max,
             current: *this.current,
         });
@@ -87,7 +87,7 @@ impl<T: Future> Future for TraceAllocator<T> {
         });
         let res = this.inner.poll(cx);
         let previous = this.previous.take();
-        if let Some(AllocFrame { max, current }) = CurrentFrame.with(|frame| {
+        if let Some(AllocationFrame { max, current }) = CurrentFrame.with(|frame| {
             let current = (*frame.borrow_mut()).take();
             *frame.borrow_mut() = previous;
             current
@@ -107,7 +107,7 @@ impl<T: Future> Future for TraceAllocator<T> {
     }
 }
 
-struct AllocFrame {
+struct AllocationFrame {
     max: usize,
     current: usize,
 }
