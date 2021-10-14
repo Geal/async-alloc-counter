@@ -78,7 +78,7 @@ pub struct AsyncAllocatorCounter<T> {
 
 unsafe impl<T: GlobalAlloc> GlobalAlloc for AsyncAllocatorCounter<T> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        CurrentFrame.with(|frame| {
+        CURRENT_FRAME.with(|frame| {
             if let Some(f) = (*frame.borrow_mut()).as_mut() {
                 f.current += layout.size();
                 if f.current > f.max {
@@ -91,7 +91,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for AsyncAllocatorCounter<T> {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        CurrentFrame.with(|frame| {
+        CURRENT_FRAME.with(|frame| {
             if let Some(f) = (*frame.borrow_mut()).as_mut() {
                 f.current -= layout.size();
             }
@@ -130,7 +130,7 @@ pin_project! {
 }
 
 thread_local! {
-    static CurrentFrame: RefCell<Option<AllocationFrame>> = RefCell::new(None);
+    static CURRENT_FRAME: RefCell<Option<AllocationFrame>> = RefCell::new(None);
 }
 
 impl<T: Future> Future for TraceAllocator<T> {
@@ -148,7 +148,7 @@ impl<T: Future> Future for TraceAllocator<T> {
         });
 
         // store the allocation frame from upper layers if there was one
-        *this.previous = CurrentFrame.with(|frame| {
+        *this.previous = CURRENT_FRAME.with(|frame| {
             let prev = (*frame.borrow_mut()).take();
             *frame.borrow_mut() = current;
             prev
@@ -157,7 +157,7 @@ impl<T: Future> Future for TraceAllocator<T> {
         let res = this.inner.poll(cx);
 
         let mut previous = this.previous.take();
-        if let Some(AllocationFrame { max, current }) = CurrentFrame.with(|frame| {
+        if let Some(AllocationFrame { max, current }) = CURRENT_FRAME.with(|frame| {
             let current = (*frame.borrow_mut()).take();
 
             if let Some(prev) = previous.as_mut() {
