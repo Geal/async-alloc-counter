@@ -117,7 +117,7 @@ pub trait TraceAlloc: Sized {
     }
 }
 
-impl<T: Sized> TraceAlloc for T {}
+impl<T: Sized + Future<Output = O>, O> TraceAlloc for T {}
 
 pin_project! {
     pub struct TraceAllocator<T> {
