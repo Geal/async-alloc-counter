@@ -4,6 +4,8 @@ version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "async-alloc-counter measures max allocations in a future invocation"
+repository = "https://github.com/Geal/async-alloc-counter"
+authors = [ "contact@geoffroycouprie.com" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
